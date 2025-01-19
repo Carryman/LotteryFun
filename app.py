@@ -7,25 +7,21 @@ import secrets
 
 app = Flask(__name__)
 
-# 讀取 Render 的 `DATABASE_URL`
-DATABASE_URL = os.getenv("DATABASE_URL")
+# 設定 PostgreSQL 連接字串
+DATABASE_URL = "postgresql://lottery_db_6opa_user:KBZVV9elK76ija0FUeQJ1ewwoAVNrfF2@dpg-cu6k97tds78s73ak6hp0-a/lottery_db_6opa"
 
-# 修正 `postgres://` 為 `postgresql://`（SQLAlchemy 需要這樣的格式）
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+# 修正 `postgres://` 為 `postgresql://`
+if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
-
-# 確保 `DATABASE_URL` 存在，否則拋出錯誤
-if not DATABASE_URL:
-    raise ValueError("Missing DATABASE_URL. Please set it in Render Environment Variables.")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# 設置速率限制（每個 IP 限制 10 次 / 分鐘）
+# 設置速率限制
 limiter = Limiter(get_remote_address, app=app, default_limits=["10 per minute"])
 
-# 設定 API 金鑰（應該從環境變數讀取）
+# 設定 API 金鑰（應該從環境變數讀取，但這裡示範用）
 VALID_API_KEY = os.getenv("API_KEY", "Bearer " + secrets.token_urlsafe(32))
 
 def verify_api_key():
