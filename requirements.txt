@@ -1,5 +1,6 @@
-
 flask
 flask_sqlalchemy
-flask_limiter
 gunicorn
+flask_limiter
+requests
+beautifulsoup4
