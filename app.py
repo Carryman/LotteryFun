@@ -7,10 +7,16 @@ import secrets
 
 app = Flask(__name__)
 
-# 讀取 Render PostgreSQL `DATABASE_URL`
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///lottery.db")  # 預設為 SQLite（本地測試用）
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")  # 修正 SQLAlchemy 格式問題
+# 讀取 Render 的 `DATABASE_URL`
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# 修正 `postgres://` 為 `postgresql://`（SQLAlchemy 需要這樣的格式）
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
+
+# 確保 `DATABASE_URL` 存在，否則拋出錯誤
+if not DATABASE_URL:
+    raise ValueError("Missing DATABASE_URL. Please set it in Render Environment Variables.")
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -19,7 +25,7 @@ db = SQLAlchemy(app)
 # 設置速率限制（每個 IP 限制 10 次 / 分鐘）
 limiter = Limiter(get_remote_address, app=app, default_limits=["10 per minute"])
 
-# 設定 API 金鑰（應該從環境變數讀取，但這裡示範用）
+# 設定 API 金鑰（應該從環境變數讀取）
 VALID_API_KEY = os.getenv("API_KEY", "Bearer " + secrets.token_urlsafe(32))
 
 def verify_api_key():
@@ -50,6 +56,11 @@ def welcome():
             "message": "Error accessing database",
             "error": str(e)
         }), 500
+
+class LotteryResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    game_type = db.Column(db.String(50), nullable=False)
+    draw_numbers = db.Column(db.String(50), nullable=False)
 
 @app.route('/api/lottery_results', methods=['GET'])
 @limiter.limit("10 per minute")  # 限制請求速率
