@@ -1,9 +1,10 @@
-import psycopg2  # 確保 psycopg2 被導入
 import os
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from sqlalchemy import inspect
 import secrets
 
 app = Flask(__name__)
@@ -18,11 +19,12 @@ if DATABASE_URL.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)  # ✅ 加入 Flask-Migrate
 
 # 設置速率限制
 limiter = Limiter(get_remote_address, app=app, default_limits=["10 per minute"])
 
-# 設定 API 金鑰（應該從環境變數讀取，但這裡示範用）
+# 設定 API 金鑰
 VALID_API_KEY = os.getenv("API_KEY", "Bearer " + secrets.token_urlsafe(32))
 
 def verify_api_key():
@@ -31,17 +33,26 @@ def verify_api_key():
     if api_key != VALID_API_KEY:
         return jsonify({"error": "Unauthorized"}), 401
 
+class LotteryResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    game_type = db.Column(db.String(50), nullable=False)
+    draw_numbers = db.Column(db.String(50), nullable=False)
+
+# ✅ **應用啟動時，檢查是否有資料表，沒有則自動建立**
+with app.app_context():
+    inspector = inspect(db.engine)
+    if 'lottery_results' not in inspector.get_table_names():
+        print("⚠️ 沒有找到 `lottery_results` 資料表，正在建立...")
+        db.create_all()
+        print("✅ `lottery_results` 資料表建立完成！")
+
 @app.route('/')
 @limiter.limit("5 per minute")  # 限制每分鐘最多 5 次請求
 def welcome():
     """ 顯示 API 健康狀態和資料庫內容 """
     try:
-        # ✅ 修正方式：使用 `inspect()` 來取得資料表名稱
-        from sqlalchemy import inspect
         inspector = inspect(db.engine)
         table_names = inspector.get_table_names()
-
-        # ✅ 修正方式：查詢每個資料表的記錄數
         table_counts = {table: db.session.execute(f"SELECT COUNT(*) FROM {table}").scalar() for table in table_names}
 
         return jsonify({
@@ -55,11 +66,6 @@ def welcome():
             "message": "Error accessing database",
             "error": str(e)
         }), 500
-
-class LotteryResult(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    game_type = db.Column(db.String(50), nullable=False)
-    draw_numbers = db.Column(db.String(50), nullable=False)
 
 @app.route('/api/lottery_results', methods=['GET'])
 @limiter.limit("10 per minute")  # 限制請求速率
