@@ -1,3 +1,4 @@
+import psycopg2  # 確保 psycopg2 被導入
 import os
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
