@@ -1,0 +1,17 @@
+
+# Project Overview
+
+## Backend:
+1. app.py - Flask application with API endpoints and security enhancements.
+2. requirements.txt - Dependency list for Python packages.
+3. lottery.db - SQLite database file (placeholder).
+
+## Frontend:
+1. lib/main.dart - Entry point for the Flutter application.
+2. lib/screens/home_screen.dart - Main screen for the app.
+3. pubspec.yaml - Flutter dependencies and configuration.
+
+## Documentation:
+1. backend/instructions.txt - Backend deployment and operation instructions.
+2. frontend/instructions.txt - Frontend development and build instructions.
+3. project_overview.txt - Overview of the project structure and included files.

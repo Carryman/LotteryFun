@@ -1,0 +1,30 @@
+
+# Backend Deployment Instructions
+
+## Steps to Deploy on Render:
+1. Install Render CLI and login to your account.
+2. Initialize the backend project: `render init`.
+3. Deploy as a Python service:
+   - Add `requirements.txt` for dependencies.
+   - Use `app.py` as the entry point.
+   - Include `lottery.db` in the deployment.
+4. Secure the API:
+   - Replace the `VALID_API_KEY` value in `app.py` with a secure key from environment variables.
+
+## Security Features:
+1. **API Key Authorization**: All requests must include the API key in the `Authorization` header.
+2. **Rate Limiting**: Limits requests to prevent abuse.
+3. **ORM with SQLAlchemy**: Prevents SQL injection by using parameterized queries.
+
+
+## Scheduled Lottery Results Scraper
+To automate fetching lottery results daily, set up a cron job:
+
+1. Run the scraper manually to test:
+   ```bash
+   python backend/scraper.py
+   ```
+2. Deploy it as a scheduled task in Render (or use a system cron job):
+   ```bash
+   echo "0 22 * * * python /path/to/backend/scraper.py" | crontab -
+   ```
