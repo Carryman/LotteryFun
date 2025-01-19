@@ -36,11 +36,13 @@ def verify_api_key():
 def welcome():
     """ 顯示 API 健康狀態和資料庫內容 """
     try:
-        # 取得所有資料表名稱
-        table_names = db.engine.table_names()
+        # ✅ 修正方式：使用 `inspect()` 來取得資料表名稱
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
 
-        # 取得每個表的資料數量
-        table_counts = {table: db.session.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in table_names}
+        # ✅ 修正方式：查詢每個資料表的記錄數
+        table_counts = {table: db.session.execute(f"SELECT COUNT(*) FROM {table}").scalar() for table in table_names}
 
         return jsonify({
             "message": "Welcome to the Lottery API!",
