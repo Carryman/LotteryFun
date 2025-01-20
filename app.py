@@ -1,15 +1,24 @@
 import os
+import requests
+import datetime
+import json
+import yaml
+import schedule
+import time
+import threading
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from sqlalchemy import inspect
-from sqlalchemy import text
+from sqlalchemy import inspect, text, desc
 import secrets
 
-
 app = Flask(__name__)
+
+# 讀取 YAML 設定檔
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
 
 # 設定 PostgreSQL 連接字串
 DATABASE_URL = "postgresql://lottery_db_6opa_user:KBZVV9elK76ija0FUeQJ1ewwoAVNrfF2@dpg-cu6k97tds78s73ak6hp0-a/lottery_db_6opa"
@@ -37,65 +46,50 @@ def verify_api_key():
 
 class LotteryResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    game_type = db.Column(db.String(50), nullable=False)
-    draw_numbers = db.Column(db.String(50), nullable=False)
+    game_code = db.Column(db.String(10), nullable=False)  # 遊戲代碼，例如 "A01"
+    draw_numbers = db.Column(db.JSON, nullable=False)  # 遊戲獎號，存為 JSON 格式
+    draw_date = db.Column(db.String(10), nullable=False)  # 日期，例如 "2025/01/22"
+    update_method = db.Column(db.String(10), nullable=False)  # "手動" 或 "自動"
 
-# ✅ **應用啟動時，檢查是否有資料表，沒有則自動建立**
-with app.app_context():
-    inspector = inspect(db.engine)
-    if 'lottery_results' not in inspector.get_table_names():
-        print("⚠️ 沒有找到 `lottery_results` 資料表，正在建立...")
-        db.create_all()
-        print("✅ `lottery_results` 資料表建立完成！")
+def get_latest_lottery_results():
+    """ 取得每種遊戲的最新一期開獎號碼 """
+    latest_results = {}
+    try:
+        game_codes = db.session.query(LotteryResult.game_code).distinct().all()
+        for code in game_codes:
+            latest_result = LotteryResult.query.filter_by(game_code=code[0]).order_by(desc(LotteryResult.draw_date)).first()
+            if latest_result:
+                latest_results[code[0]] = {
+                    "draw_date": latest_result.draw_date,
+                    "draw_numbers": json.loads(latest_result.draw_numbers)
+                }
+    except Exception as e:
+        print(f"❌ 無法取得最新開獎號碼: {str(e)}")
+    return latest_results
 
 @app.route('/')
 @limiter.limit("5 per minute")  # 限制每分鐘最多 5 次請求
 def welcome():
-    """ 顯示 API 健康狀態和資料庫內容 """
+    """ 顯示 API 健康狀態、資料庫內容及最新一期獎號 """
     try:
         inspector = inspect(db.engine)
         table_names = inspector.get_table_names()
-
-        # ✅ 修正方式：使用 `text()` 來包裝 SQL 查詢
         table_counts = {table: db.session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() for table in table_names}
+        
+        latest_results = get_latest_lottery_results()
 
         return jsonify({
             "message": "Welcome to the Lottery API!",
             "status": "Service is running",
             "database_tables": table_names,
-            "record_counts": table_counts
+            "record_counts": table_counts,
+            "latest_results": latest_results
         })
     except Exception as e:
         return jsonify({
             "message": "Error accessing database",
             "error": str(e)
         }), 500
-
-@app.route('/api/lottery_results', methods=['GET'])
-@limiter.limit("10 per minute")  # 限制請求速率
-def get_lottery_results():
-    """ 取得開獎號碼，需要 API 金鑰 """
-    auth_response = verify_api_key()
-    if auth_response:
-        return auth_response
-
-    results = LotteryResult.query.all()
-    return jsonify([{"game_type": r.game_type, "draw_numbers": r.draw_numbers} for r in results])
-
-@app.route('/api/check_numbers', methods=['POST'])
-@limiter.limit("5 per minute")  # 限制對獎請求
-def check_numbers():
-    """ 使用者對獎 API """
-    auth_response = verify_api_key()
-    if auth_response:
-        return auth_response
-
-    data = request.get_json()
-    user_numbers = data.get('numbers')
-    result = LotteryResult.query.filter_by(draw_numbers=user_numbers).first()
-    if result:
-        return jsonify({'status': 'win', 'game_type': result.game_type})
-    return jsonify({'status': 'lose'}), 404
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)
