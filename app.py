@@ -5,7 +5,9 @@ from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sqlalchemy import inspect
+from sqlalchemy import text
 import secrets
+
 
 app = Flask(__name__)
 
@@ -53,7 +55,9 @@ def welcome():
     try:
         inspector = inspect(db.engine)
         table_names = inspector.get_table_names()
-        table_counts = {table: db.session.execute(f"SELECT COUNT(*) FROM {table}").scalar() for table in table_names}
+
+        # ✅ 修正方式：使用 `text()` 來包裝 SQL 查詢
+        table_counts = {table: db.session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() for table in table_names}
 
         return jsonify({
             "message": "Welcome to the Lottery API!",

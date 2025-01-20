@@ -1,0 +1,5 @@
+lottery_scraper:
+  schedules:  # 支援多個時間點
+    - "02:00"
+    - "08:00"
+    - "18:00"
